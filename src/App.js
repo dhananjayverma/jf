@@ -1,23 +1,106 @@
-import logo from './logo.svg';
-import './App.css';
-
+import React, { useState, useEffect } from 'react';
+import UserTable from './Comp/User';
+import UserForm from './Comp/UserForm1';
+import DeleteUserPrompt from './Comp/DeletPrompt';
+import axios from 'axios';
+import './App.css'
 function App() {
+  const [users, setUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get('https://usermanagement-zczb.onrender.com/api/users');
+      setUsers(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  const handleUserSelect = (id, isChecked) => {
+    if (isChecked) {
+      setSelectedUsers([...selectedUsers, id]);
+    } else {
+      setSelectedUsers(selectedUsers.filter((userId) => userId !== id));
+    }
+  };
+
+  const handleUserDelete = async () => {
+    if (userToDelete) {
+      try {
+        await axios.delete(`http://localhost:5000/api/users/${userToDelete}`);
+        setUsers(users.filter((user) => user._id !== userToDelete));
+        setUserToDelete(null);
+        setShowDeletePrompt(false);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+
+  const handleUserAdd = async (user) => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/users', user);
+      setUsers([...users, response.data]);
+      setShowForm(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleUserExport = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/users/export', { ids: selectedUsers }, {
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'users.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app-container">
+      <h1>User Management</h1>
+     <div>
+       <button onClick={() => setShowForm(true)}>SIGN UP</button>
+      <button onClick={handleUserExport} disabled={selectedUsers.length === 0}>
+        EXPORT
+      </button>
+     </div>
+      <UserTable
+        users={users}
+        onUserSelect={handleUserSelect}
+        onDeleteUser={(userId) => {
+          setUserToDelete(userId);
+          setShowDeletePrompt(true);
+        }}
+      />
+      {showForm && (
+        <UserForm
+          onCancel={() => setShowForm(false)}
+          onAddUser={handleUserAdd}
+        />
+      )}
+      {showDeletePrompt && (
+        <DeleteUserPrompt
+          onCancel={() => setShowDeletePrompt(false)}
+          onDelete={handleUserDelete}
+        />
+      )}
     </div>
   );
 }
